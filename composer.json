@@ -1,0 +1,63 @@
+{
+    "name": "windhamg/simplesamlphp-module-msverifiedid",
+    "description": "This module provides an authentication module that uses Microsoft Entra Verified ID",
+    "type": "simplesamlphp-module",
+    "keywords": [
+        "simplesamlphp",
+        "msverifiedid",
+        "verifiedid"
+    ],
+    "license": "LGPL-2.1-only",
+    "authors": [
+        {
+            "name": "Gary Windham",
+            "email": "gary@cirrusidentity.com"
+        }
+    ],
+    "config": {
+        "preferred-install": {
+            "simplesamlphp/simplesamlphp": "source",
+            "*": "dist"
+        },
+        "allow-plugins": {
+            "composer/package-versions-deprecated": true,
+            "simplesamlphp/composer-module-installer": true
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "SimpleSAML\\Module\\authorize\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SimpleSAML\\Module\\Authorize\\Tests\\Utils\\": "tests/Utils",
+            "SimpleSAML\\Test\\Utils\\": "vendor/simplesamlphp/simplesamlphp/tests/Utils"
+        }
+    },
+    "require": {
+        "php": ">=7.4 || ^8.0",
+        "simplesamlphp/assert": "~0.8.0",
+        "simplesamlphp/simplesamlphp": "^2.0.0-rc2",
+        "simplesamlphp/composer-module-installer": "^1.2.0",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "simplesamlphp/simplesamlphp-test-framework": "dev-master",
+        "phpunit/phpunit": "^9.5"
+    },
+    "support": {
+        "issues": "https://github.com/windhamg/simplesamlphp-module-msverifiedid/issues",
+        "source": "https://github.com/windhamg/simplesamlphp-module-msverifiedid"
+    },
+    "scripts": {
+        "validate": [
+            "vendor/bin/phpunit --no-coverage",
+            "vendor/bin/phpcs -p",
+            "vendor/bin/psalm"
+        ],
+        "tests": [
+            "vendor/bin/phpunit --no-coverage"
+        ]
+    }
+}
