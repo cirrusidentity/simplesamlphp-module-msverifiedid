@@ -1,0 +1,15 @@
+msverifiedid-verify:
+    path:       /verify
+    defaults:   { _controller: 'SimpleSAML\Module\msverifiedid\Controller\MicrosoftVerifiedId::verify' }
+msverifiedid-resume:
+    path:       /resume
+    defaults:   { _controller: 'SimpleSAML\Module\msverifiedid\Controller\MicrosoftVerifiedId::resume' }
+msverifiedid-status:
+    path:       /status
+    defaults:   { _controller: 'SimpleSAML\Module\msverifiedid\Controller\MicrosoftVerifiedId::status' }
+msverifiedid-callback:
+    path:       /callback
+    defaults:   { _controller: 'SimpleSAML\Module\msverifiedid\Controller\MicrosoftVerifiedId::callback' }
+msverifiedid-failed:
+    path:       /failed
+    defaults:   { _controller: 'SimpleSAML\Module\msverifiedid\Controller\MicrosoftVerifiedId::failed' }

@@ -40,7 +40,9 @@
         "simplesamlphp/assert": "~0.8.0",
         "simplesamlphp/simplesamlphp": "^2.0.0-rc2",
         "simplesamlphp/composer-module-installer": "^1.2.0",
-        "ext-json": "*"
+        "ext-json": "*",
+        "thenetworg/oauth2-azure": "^2.1",
+        "ramsey/uuid": "^4.6"
     },
     "require-dev": {
         "simplesamlphp/simplesamlphp-test-framework": "dev-master",
