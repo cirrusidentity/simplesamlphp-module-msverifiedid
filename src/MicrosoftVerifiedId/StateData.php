@@ -68,6 +68,13 @@ class StateData
     public bool $allowRevoked = false;
 
     /**
+     * Whether linked domain should be validated
+     * 
+     * @var bool
+     */
+    public bool $validateLinkedDomain = true;
+
+    /**
      * OAuth2 scope for Verifiable Credentials Service Request
      * 
      * @var string

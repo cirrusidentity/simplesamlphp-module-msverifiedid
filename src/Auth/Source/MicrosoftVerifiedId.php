@@ -8,6 +8,7 @@ use SimpleSAML\Error;
 use SimpleSAML\Module;
 use SimpleSAML\Utils;
 use SimpleSAML\Logger;
+use SimpleSAML\Session;
 use SimpleSAML\Store\StoreFactory;
 use SimpleSAML\Store\StoreInterface;
 use GuzzleHttp\Client;
@@ -139,6 +140,16 @@ class MicrosoftVerifiedId extends Auth\Source
         if (array_key_exists('verifier_request_purpose', $moduleConfig)) {
             $this->stateData->verifierRequestPurpose = $moduleConfig['verifier_request_purpose'];
         }
+
+        // Set the optional allow revoked flag if set by configuration
+        if (array_key_exists('allow_revoked', $moduleConfig)) {
+            $this->stateData->allowRevoked = $moduleConfig['allow_revoked'];
+        }
+        
+        // Set the optional allow validateLinkedDomain flag if set by configuration
+        if (array_key_exists('validate_linked_domain', $moduleConfig)) {
+            $this->stateData->validateLinkedDomain = $moduleConfig['validate_linked_domain'];
+        }
         
         // Set the optional MS API base URL if set by configuration
         if (array_key_exists('ms_api_base_url', $moduleConfig)) {
@@ -165,7 +176,8 @@ class MicrosoftVerifiedId extends Auth\Source
             session_start();
         }
 
-        if (!isset($_SESSION['claims'])) {
+        $claims = Session::getSessionFromRequest()->getData('array', 'claims');
+        if (is_null($claims)) {
             // The user isn't authenticated
             return null;
         }
@@ -176,7 +188,7 @@ class MicrosoftVerifiedId extends Auth\Source
          * to store them as arrays.
          */
         $attributes = [];
-        foreach ($_SESSION['claims'] as $attr => $val) {
+        foreach ($claims as $attr => $val) {
             $attributes[$attr] = [$val];
         }
 
@@ -315,14 +327,15 @@ class MicrosoftVerifiedId extends Auth\Source
 
         /* Get access token */
         $provider = new Azure([
-            'clientId'                  => $source->clientId,
-            'clientSecret'              => $source->clientSecret,
-            'tenant'                    => $source->tenantId,
+            'clientId'                  => $source->stateData->clientId,
+            'clientSecret'              => $source->stateData->clientSecret,
+            'tenant'                    => $source->stateData->tenantId,
             'defaultEndPointVersion'    => Azure::ENDPOINT_VERSION_2_0
         ]);
     
         try {
-            $token = $provider->getAccessToken('client_credentials', ['scope' => $source->scope])->getToken();
+            $token = $provider->getAccessToken('client_credentials', ['scope' => $source->stateData->scope])->getToken();
+            Logger::debug("*** token = $token");
         } catch(\Exception $e) {
             throw new Error\Exception('Get AAD access token failed: '.$e->getMessage());
         }
@@ -337,41 +350,48 @@ class MicrosoftVerifiedId extends Auth\Source
                     'api-key' => $apiKey
                 ]
             ],
-            'authority' => $source->verifierId,
+            'authority' => $source->stateData->verifierId,
             'registration' => [
-                'clientName' => $source->verifierClientName
+                'clientName' => $source->stateData->verifierClientName
             ],
             'includeReceipt' => false,
             'requestedCredentials' => [
-                'type' => $source->verifiableCredentialType,
-                'acceptedIssuers' => $source->acceptedIssuerIds,
-                'configuration' => [
-                    'validation' => [
-                        'allowRevoked' => $source->allowRevoked,
-                        'validateLinkedDomain' => true
+                [
+                    'type' => $source->stateData->verifiableCredentialType,
+                    'acceptedIssuers' => $source->stateData->acceptedIssuerIds,
+                    'configuration' => [
+                        'validation' => [
+                            'allowRevoked' => $source->stateData->allowRevoked,
+                            'validateLinkedDomain' => true
+                        ]
                     ]
                 ]
+
             ]
         ];
-        if ($source->verifierRequestPurpose !== null) {
-            $verifyRequest['requestedCredentials']['purpose'] = $source->verifierRequestPurpose;
+        if ($source->stateData->verifierRequestPurpose !== null) {
+            $verifyRequest['requestedCredentials'][0]['purpose'] = $source->stateData->verifierRequestPurpose;
         }
 
+        Logger::debug("*** createPresentationRequest body: " . json_encode($verifyRequest, JSON_UNESCAPED_SLASHES));
         /* Setup request to send json via POST */
         $httpClient = new Client();
         $response = $httpClient->request(
             'POST',
-            $source->msApiBaseUrl . 'verifiableCredentials/createPresentationRequest',
+            $source->stateData->msApiBaseUrl . 'verifiableCredentials/createPresentationRequest',
             [
+                'http_errors' => false,
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $token
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json'
                 ],
-                'json' => $verifyRequest
+                'body' => json_encode($verifyRequest, JSON_UNESCAPED_SLASHES)
             ]
         );
         if ($response->getStatusCode() === 201) {
             // return MS Authenticator URL from response
             $respObj = json_decode($response->getBody());
+            Logger::debug("*** createPresentationRequest response: " . json_encode($respObj));
             return $respObj->url;
         }
 
@@ -415,7 +435,7 @@ class MicrosoftVerifiedId extends Auth\Source
 
         $storedData = self::getStore()->get('array', "msverifiedid-$opaqueId");
         if (array_key_exists('claims', $storedData) && $storedData['claims'] !== null) {
-            $_SESSION['claims'] = $storedData['claims'];
+            Session::getSessionFromRequest()->setData('array', 'claims', $storedData['claims']);
             $httpUtils = new Utils\HTTP();
             $httpUtils->redirectTrustedURL($returnTo);
         }
@@ -440,6 +460,8 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\Exception
      */
     public static function handleStatusCheck($stateId, $opaqueId) {
+        Logger::debug("***opaqueId = $opaqueId");
+
         assert(is_string($stateId));
 
         /* Retrieve the authentication state. */
@@ -491,6 +513,10 @@ class MicrosoftVerifiedId extends Auth\Source
         /* Retrieve stored API Key and claims by opaqueId */
         $store = self::getStore();
         $storedData = $store->get('array', "msverifiedid-$opaqueId");
+        Logger::debug("*** MS-passed apiKey = $apiKey");
+        Logger::debug("*** stored apiKey = {$storedData['apiKey']}");
+        Logger::debug("*** callback body: " . print_r($body, true));
+
         if ($storedData) {
             /* Ensure API key returned by MS is the same one we initially set */
             if (array_key_exists('apiKey', $storedData) && $storedData['apiKey'] === $apiKey) {
@@ -564,15 +590,10 @@ class MicrosoftVerifiedId extends Auth\Source
     {
         assert(is_array($state));
 
-        if (!session_id()) {
-            // session_start not called before. Do it here
-            session_start();
-        }
-
         /*
-         * In this example we simply remove the 'uid' from the session.
+         * delete claims from session
          */
-        unset($_SESSION['claims']);
+        Session::getSessionFromRequest()->deleteData('array', 'claims');
 
         /*
          * If we need to do a redirect to a different page, we could do this

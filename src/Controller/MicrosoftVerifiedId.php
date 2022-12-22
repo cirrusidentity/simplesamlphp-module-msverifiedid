@@ -97,9 +97,9 @@ class MicrosoftVerifiedId
      */
     public function resume(Request $request): void
     {
-        $stateId = $request->query->get('StateId', false);
+        $stateId = $request->query->get('State', false);
         if ($stateId === false) {
-            throw new Error\BadRequest('Missing required StateId query parameter.');
+            throw new Error\BadRequest('Missing required State query parameter.');
         }
 
         \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::resume($stateId);
@@ -119,11 +119,11 @@ class MicrosoftVerifiedId
      */
     public function status(Request $request): Response
     {
-        $stateId = $request->query->get('StateId', false);
+        $stateId = $request->query->get('State', false);
         if ($stateId === false) {
-            throw new Error\BadRequest('Missing required StateId query parameter.');
+            throw new Error\BadRequest('Missing required State query parameter.');
         }
-        $opaqueId = $_SESSION['opaqueId'];
+        $opaqueId = $this->session->getData('string', 'opaqueId');
         $status = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStatusCheck($stateId, $opaqueId);
         switch($status) {
             case \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::PRES_REQ_RETRIEVED:
@@ -176,13 +176,12 @@ class MicrosoftVerifiedId
                 \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStop($stateId);
             }
 
-            $opaqueId = $_SESSION['opaqueId'];
+            $opaqueId = $this->session->getData('string', 'opaqueId');
             \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin($stateId, $opaqueId, $returnTo);
         } else {
             // if we get this far, we need to show the verified ID presentation request page to the user
             $opaqueId = Uuid::uuid4()->toString();
-            $_SESSION['opaqueId'] = $opaqueId;
-
+            $this->session->setData('string', 'opaqueId', $opaqueId);
             $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::initVerifyRequest($stateId, $opaqueId);
             $statusUrl = Module::getModuleURL('msverifiedid/status', [
                 'State' => $stateId,

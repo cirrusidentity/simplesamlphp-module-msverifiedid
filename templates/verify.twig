@@ -1,28 +1,37 @@
 {% extends "base.twig" %}
 
+{% block preload %}
+    <link rel="stylesheet" type="text/css" href="{{ asset('css/styles.css', 'msverifiedid') }}" />
+{% endblock %}
+
 {% block content %}
-  <h1>{% trans %}Verify Credential{% endtrans %}</h1>
-  <div id="qrText" style="display:none;">
-    <p class="small-text">
-        <img src="{{ asset('images/authenticator-icon.png', 'msverifiedid') }}" alt="Authenticator icon" class="icon-small"><br>
-        {% trans %}Scan with Microsoft Authenticator{% endtrans %}
-    </p>
+
+  <div id="wrap">
+    <div style="text-align: center;">
+      <h1>{% trans %}Verify Credential{% endtrans %}</h1>
+      <div id="qrText" style="display:none;">
+        <p class="small-text">
+          <img src="{{ asset('images/authenticator-icon.png', 'msverifiedid') }}" alt="Authenticator icon" class="icon-small"><br>
+          {% trans %}Scan with Microsoft Authenticator{% endtrans %}
+        </p>
+      </div>
+      <div id="qrcode" style="text-align: center";></div>
+      <div id="message-wrapper" style="margin-top: 75px; margin-bottom: 75px; display:none;">
+        <div id="message"></div>
+      </div>
+      <form method="post" id='form' action="?">
+        <input type="hidden" name="ReturnTo" value="{{ return_to_url }}">
+        <button type="submit" name="action" value="STOP" class="button margin-top-50">{% trans %}Cancel{% endtrans %}
+      </form>
+    </div>
   </div>
-  <div id="qrcode" style="text-align: center";></div>
-  <div id="message-wrapper" style="margin-top: 75px; margin-bottom: 75px; display:none;">
-    <div id="message"></div>
-  </div>
-  <form method="post" id='form' action="?">
-    <input type="hidden" name="ReturnTo" value="{{ return_to_url|url_encode }}">
-    <p><input type="submit" name="action" value="STOP">{% trans %}Cancel{% endtrans %}</p>
-  </form>
 {% endblock %}
 
 {% block postload %}
   <script type="text/javascript" src="{{ asset('js/qrcode.min.js', 'msverifiedid') }}"></script>
   <script>
-    var verifyUrl = "{{ verify_url|url_encode }}";
-    var statusUrl = "{{ status_url|url_encode }}";
+    var verifyUrl = "{{ verify_url }}";
+    var statusUrl = "{{ status_url }}";
     var qrcode = new QRCode("qrcode", { width: 300, height: 300 });
     document.addEventListener("DOMContentLoaded", function() {
       if( /Android/i.test(navigator.userAgent) ) {
@@ -34,7 +43,7 @@
         );
       } else if ( /iPhone/i.test(navigator.userAgent) ) {
         console.log(`iOS device! Using deep link (${verifyUrl}).`);
-        window.location.replace(respPresentationReq.url);
+        window.location.replace(verifyUrl);
       } else {
         console.log(`Not Android or iOS. Generating QR code for ${verifyUrl}`);
         qrcode.makeCode(verifyUrl);
