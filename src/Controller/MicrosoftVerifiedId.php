@@ -5,6 +5,7 @@ namespace SimpleSAML\Module\msverifiedid\Controller;
 use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
+use SimpleSAML\Logger;
 use SimpleSAML\Module;
 use SimpleSAML\Session;
 use SimpleSAML\Utils;
@@ -29,6 +30,17 @@ class MicrosoftVerifiedId
     /** @var \SimpleSAML\Session */
     protected \SimpleSAML\Session $session;
 
+    /**
+     * @var \SimpleSAML\Auth\State|string
+     * @psalm-var \SimpleSAML\Auth\State|class-string
+     */
+    protected $authState = Auth\State::class;
+
+    /**
+     * @var \SimpleSAML\Logger|string
+     * @psalm-var \SimpleSAML\Logger|class-string
+     */
+    protected $logger = Logger::class;
 
     /**
      * Controller constructor.
@@ -48,10 +60,29 @@ class MicrosoftVerifiedId
         $this->session = $session;
     }
 
+    /**
+     * Inject the \SimpleSAML\Auth\State dependency.
+     *
+     * @param \SimpleSAML\Auth\State $authState
+     */
+    public function setAuthState(Auth\State $authState): void
+    {
+        $this->authState = $authState;
+    }
 
-    /** 
+    /**
+     * Inject the \SimpleSAML\Logger dependency.
+     *
+     * @param \SimpleSAML\Logger $logger
+     */
+    public function setLogger(Logger $logger): void
+    {
+        $this->logger = $logger;
+    }
+
+    /**
      * Callback handler for MS Verified ID API
-     * 
+     *
      * @param \Symfony\Component\HttpFoundation\Request $request
      * @return \Symfony\Component\HttpFoundation\Response
      */
@@ -66,7 +97,7 @@ class MicrosoftVerifiedId
         /* Check if callback was valid and respond appropriately */
         $response = new Response('', 200);
         if (!$res) {
-            $response->setStatusCode(401); 
+            $response->setStatusCode(401);
             $response->setContent(json_encode([
                 'error' => 'api-key wrong or missing'
             ]));
@@ -97,12 +128,13 @@ class MicrosoftVerifiedId
      */
     public function resume(Request $request): void
     {
-        $stateId = $request->query->get('State', false);
-        if ($stateId === false) {
-            throw new Error\BadRequest('Missing required State query parameter.');
+        $stateId = $request->query->get('StateId');
+        if (!$stateId) {
+            throw new Error\BadRequest('Missing required StateId query parameter.');
         }
+        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
 
-        \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::resume($stateId);
+        \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::resume($state);
 
         /*
          * The resume function should not return, so we never get this far.
@@ -119,13 +151,17 @@ class MicrosoftVerifiedId
      */
     public function status(Request $request): Response
     {
-        $stateId = $request->query->get('State', false);
-        if ($stateId === false) {
-            throw new Error\BadRequest('Missing required State query parameter.');
+        $stateId = $request->query->get('StateId');
+        if (!$stateId) {
+            throw new Error\BadRequest('Missing required StateId query parameter.');
         }
+        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
         $opaqueId = $this->session->getData('string', 'opaqueId');
-        $status = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStatusCheck($stateId, $opaqueId);
-        switch($status) {
+        $status = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStatusCheck(
+            $state,
+            $opaqueId
+        );
+        switch ($status) {
             case \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::PRES_REQ_RETRIEVED:
                 $statusCode = 202;
                 break;
@@ -147,6 +183,14 @@ class MicrosoftVerifiedId
      */
     public function verify(Request $request): Template
     {
+        $stateId = $request->get('StateId');
+        if (!$stateId) {
+            throw new Error\BadRequest('Missing required StateId query parameter.');
+        }
+        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
+
+        Logger::info("*** verify state = " . print_r($state, true));
+
         $returnTo = $request->get('ReturnTo', false);
         if ($returnTo === false) {
             throw new Error\BadRequest('Missing required ReturnTo parameter.');
@@ -155,42 +199,35 @@ class MicrosoftVerifiedId
         $httpUtils = new Utils\HTTP();
         $returnTo = $httpUtils->checkURLAllowed($returnTo);
 
-        /**
-         * What we do here is to extract the $state-array identifier, and check that it belongs to
-         * the msverifiedid:Verify process.
-         */
-        if (!preg_match('@State=(.*)@', $returnTo, $matches)) {
-            die('Invalid ReturnTo URL for this example.');
-        }
-
-        /**
-         * The loadState-function will not return if the second parameter does not
-         * match the parameter passed to saveState, so by now we know that we arrived here
-         * through the msverifiedid:Verify authentication page.
-         */
-        $stateId = urldecode($matches[1]);
-
         // time to handle login response
         if ($request->isMethod('POST')) {
             if ($request->request->get('action', null) === 'STOP') {
-                \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStop($stateId);
+                \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStop($state);
             }
 
             $opaqueId = $this->session->getData('string', 'opaqueId');
-            \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin($stateId, $opaqueId, $returnTo);
+            \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin(
+                $state,
+                $opaqueId,
+                $returnTo
+            );
         } else {
             // if we get this far, we need to show the verified ID presentation request page to the user
             $opaqueId = Uuid::uuid4()->toString();
             $this->session->setData('string', 'opaqueId', $opaqueId);
-            $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::initVerifyRequest($stateId, $opaqueId);
+            $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::initVerifyRequest(
+                $state,
+                $opaqueId
+            );
             $statusUrl = Module::getModuleURL('msverifiedid/status', [
-                'State' => $stateId,
+                'StateId' => $stateId,
             ]);
 
             $t = new Template($this->config, 'msverifiedid:verify.twig');
             $t->data['verify_url'] = $verifyUrl;
             $t->data['status_url'] = $statusUrl;
             $t->data['return_to_url'] = $returnTo;
+            $t->data['state_id'] = $stateId;
             $t->setStatusCode(200);
             return $t;
         }

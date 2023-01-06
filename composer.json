@@ -26,13 +26,7 @@
     },
     "autoload": {
         "psr-4": {
-            "SimpleSAML\\Module\\authorize\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "SimpleSAML\\Module\\Authorize\\Tests\\Utils\\": "tests/Utils",
-            "SimpleSAML\\Test\\Utils\\": "vendor/simplesamlphp/simplesamlphp/tests/Utils"
+            "SimpleSAML\\Module\\msverifiedid\\": "src/"
         }
     },
     "require": {
@@ -45,8 +39,9 @@
         "ramsey/uuid": "^4.6"
     },
     "require-dev": {
-        "simplesamlphp/simplesamlphp-test-framework": "dev-master",
-        "phpunit/phpunit": "^9.5"
+        "phpunit/phpunit": "^9.5",
+        "cirrusidentity/simplesamlphp-test-utils": "v2.x-dev",
+        "simplesamlphp/simplesamlphp-test-framework": "~1.2.1"
     },
     "support": {
         "issues": "https://github.com/windhamg/simplesamlphp-module-msverifiedid/issues",
