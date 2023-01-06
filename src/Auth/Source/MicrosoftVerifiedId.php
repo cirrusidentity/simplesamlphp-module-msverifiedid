@@ -226,11 +226,14 @@ class MicrosoftVerifiedId extends Auth\Source
         $stateId = Auth\State::saveState($state, self::STAGEID);
 
         $returnTo = Module::getModuleURL('msverifiedid/resume', [
-            'State' => $stateId,
+            'StateId' => $stateId,
         ]);
-        $verifyPage = Module::getModuleURL('msverifiedid/verify');
+        $verifyPage = Module::getModuleURL('msverifiedid/verify', [
+            'StateId' => $stateId,
+        ]);
         $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL($verifyPage, [
+            'StateId' => $stateId,
             'ReturnTo' => $returnTo,
         ]);
 
@@ -441,7 +444,7 @@ class MicrosoftVerifiedId extends Auth\Source
         }
         Logger::error("credential verification failed");
         $failed = Module::getModuleURL('msverifiedid/failed', [
-            'State' => $stateId,
+            'StateId' => $stateId,
         ]);
         $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL($failed);

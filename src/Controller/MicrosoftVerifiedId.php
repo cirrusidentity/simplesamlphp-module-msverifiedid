@@ -155,10 +155,9 @@ class MicrosoftVerifiedId
         if (!$stateId) {
             throw new Error\BadRequest('Missing required StateId query parameter.');
         }
-        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
         $opaqueId = $this->session->getData('string', 'opaqueId');
         $status = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStatusCheck(
-            $state,
+            $stateId,
             $opaqueId
         );
         switch ($status) {
@@ -187,9 +186,6 @@ class MicrosoftVerifiedId
         if (!$stateId) {
             throw new Error\BadRequest('Missing required StateId query parameter.');
         }
-        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
-
-        Logger::info("*** verify state = " . print_r($state, true));
 
         $returnTo = $request->get('ReturnTo', false);
         if ($returnTo === false) {
@@ -202,12 +198,12 @@ class MicrosoftVerifiedId
         // time to handle login response
         if ($request->isMethod('POST')) {
             if ($request->request->get('action', null) === 'STOP') {
-                \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStop($state);
+                \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleStop($stateId);
             }
 
             $opaqueId = $this->session->getData('string', 'opaqueId');
             \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin(
-                $state,
+                $stateId,
                 $opaqueId,
                 $returnTo
             );
@@ -216,7 +212,7 @@ class MicrosoftVerifiedId
             $opaqueId = Uuid::uuid4()->toString();
             $this->session->setData('string', 'opaqueId', $opaqueId);
             $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::initVerifyRequest(
-                $state,
+                $stateId,
                 $opaqueId
             );
             $statusUrl = Module::getModuleURL('msverifiedid/status', [
