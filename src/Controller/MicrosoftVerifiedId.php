@@ -132,9 +132,8 @@ class MicrosoftVerifiedId
         if (!$stateId) {
             throw new Error\BadRequest('Missing required StateId query parameter.');
         }
-        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
 
-        \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::resume($state);
+        \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::resume($stateId);
 
         /*
          * The resume function should not return, so we never get this far.
