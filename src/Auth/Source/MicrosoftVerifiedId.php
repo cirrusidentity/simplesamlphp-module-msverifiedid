@@ -257,14 +257,8 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function resume($stateId)
+    public static function resume($state)
     {
-        /* Retrieve the authentication state. */
-        $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
-        if (is_null($state)) {
-            throw new \SimpleSAML\Error\NoState();
-        }
-
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
 
@@ -298,7 +292,7 @@ class MicrosoftVerifiedId extends Auth\Source
      * the needed info to render the QR code or, on mobile platforms,
      * to open a deep link in Microsoft Authenticator.
      *
-     * @param string $stateId
+     * @param array|null $state
      * @param string $opaqueId
      * @param $presReqHelperClass
      * @return string url
@@ -306,17 +300,11 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\Exception
      */
     public static function handleVerifyRequest(
-        $stateId,
+        $state,
         $opaqueId,
         $presReqHelperClass
     )
     {
-        /* Retrieve the authentication state. */
-        $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
-        if (is_null($state)) {
-            throw new \SimpleSAML\Error\NoState();
-        }
-
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
 
@@ -356,21 +344,14 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function handles the login after successfully
      * completing the credentials verification process
      *
-     * @param string $stateId
+     * @param array|null $state
      * @param string $opaqueId
      * @param string $returnTo
      * @return void
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function handleLogin($stateId, $opaqueId, $returnTo) {
-        assert(is_string($stateId));
-
-        /* Retrieve the authentication state. */
-        $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
-        if (is_null($state)) {
-            throw new \SimpleSAML\Error\NoState();
-        }
-
+    public static function handleLogin($state, $opaqueId, $returnTo)
+    {
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
 
@@ -390,9 +371,7 @@ class MicrosoftVerifiedId extends Auth\Source
             $httpUtils->redirectTrustedURL($returnTo);
         }
         Logger::error("credential verification failed");
-        $failed = Module::getModuleURL('msverifiedid/failed', [
-            'StateId' => $stateId,
-        ]);
+        $failed = Module::getModuleURL('msverifiedid/failed');
         $httpUtils = new Utils\HTTP();
         $httpUtils->redirectTrustedURL($failed);
     }
@@ -403,19 +382,13 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function handles the status check AJAX call
      * from the browser to determine if verification completed
      *
-     * @param string $stateId
+     * @param array|null $state
      * @param string $opaqueId
      * @return int
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function handleStatusCheck($stateId, $opaqueId) {
-        /* Retrieve the authentication state. */
-        $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
-        if (is_null($state)) {
-            throw new \SimpleSAML\Error\NoState();
-        }
-
+    public static function handleStatusCheck($state, $opaqueId) {
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
 
@@ -500,19 +473,13 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function handles cancellation of the
      * process by returning a SAML Error Response
      *
-     * @param string $stateId
+     * @param array|null $state
      * @return void
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Error
      */
-    public static function handleStop($stateId) {
+    public static function handleStop($state) {
         Logger::notice("Authentication stopped");
-
-        /* Retrieve the authentication state. */
-        $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
-        if (is_null($state)) {
-            throw new \SimpleSAML\Error\NoState();
-        }
 
         Auth\State::throwException(
             $state,
