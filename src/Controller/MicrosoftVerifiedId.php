@@ -7,6 +7,8 @@ use SimpleSAML\Configuration;
 use SimpleSAML\Error;
 use SimpleSAML\Logger;
 use SimpleSAML\Module;
+use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper;
+use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\RestApiPresentationRequestHelper;
 use SimpleSAML\Session;
 use SimpleSAML\Utils;
 use SimpleSAML\XHTML\Template;
@@ -43,6 +45,12 @@ class MicrosoftVerifiedId
     protected $logger = Logger::class;
 
     /**
+     * @var string
+     * @psalm-var class-string
+     */
+    protected $presReqHelperClass = RestApiPresentationRequestHelper::class;
+
+    /**
      * Controller constructor.
      *
      * It initializes the global configuration and auth source configuration for the controllers implemented here.
@@ -68,6 +76,17 @@ class MicrosoftVerifiedId
     public function setAuthState(Auth\State $authState): void
     {
         $this->authState = $authState;
+    }
+
+    /**
+     * Inject the \SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper class dependency,
+     * for injecting mock presentation request backend for testing
+     *
+     * @param string $presReqHelperClass
+     */
+    public function setPresReqHelperClass(string $presReqHelperClass): void
+    {
+        $this->presReqHelperClass = $presReqHelperClass;
     }
 
     /**
@@ -210,9 +229,10 @@ class MicrosoftVerifiedId
             // if we get this far, we need to show the verified ID presentation request page to the user
             $opaqueId = Uuid::uuid4()->toString();
             $this->session->setData('string', 'opaqueId', $opaqueId);
-            $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::initVerifyRequest(
+            $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleVerifyRequest(
                 $stateId,
-                $opaqueId
+                $opaqueId,
+                $this->presReqHelperClass
             );
             $statusUrl = Module::getModuleURL('msverifiedid/status', [
                 'StateId' => $stateId,

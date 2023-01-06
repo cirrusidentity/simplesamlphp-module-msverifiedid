@@ -11,11 +11,9 @@ use SimpleSAML\Logger;
 use SimpleSAML\Session;
 use SimpleSAML\Store\StoreFactory;
 use SimpleSAML\Store\StoreInterface;
-use GuzzleHttp\Client;
 use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\StateData;
-use TheNetworg\OAuth2\Client\Provider\Azure;
+use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper;
 use Ramsey\Uuid\Uuid;
-
 
 /**
  * Microsoft Entra Verified ID authentication source.
@@ -54,7 +52,7 @@ class MicrosoftVerifiedId extends Auth\Source
      * retrieved, but not verified
      */
     public const PRES_REQ_RETRIEVED = 1;
-    
+
     /**
      * The constant value we return to indicate
      * that VC presentation request has been
@@ -116,26 +114,32 @@ class MicrosoftVerifiedId extends Auth\Source
         if (array_key_exists('verifier_client_name', $moduleConfig)) {
             $this->stateData->verifierClientName = $moduleConfig['verifier_client_name'];
         } else {
-            throw new Error\CriticalConfigurationError('msverifiedid: it is required to set verifier_client_name in config.');
+            throw new Error\CriticalConfigurationError(
+                'msverifiedid: it is required to set verifier_client_name in config.'
+            );
         }
 
         if (array_key_exists('verifier_credential_type', $moduleConfig)) {
             $this->stateData->verifiableCredentialType = $moduleConfig['verifier_credential_type'];
         } else {
-            throw new Error\CriticalConfigurationError('msverifiedid: it is required to set verifier_credential_type in config.');
+            throw new Error\CriticalConfigurationError(
+                'msverifiedid: it is required to set verifier_credential_type in config.'
+            );
         }
 
         if (array_key_exists('accepted_issuer_ids', $moduleConfig)) {
             $this->stateData->acceptedIssuerIds = $moduleConfig['accepted_issuer_ids'];
         } else {
-            throw new Error\CriticalConfigurationError('msverifiedid: it is required to set accepted_issuer_ids in config.');
+            throw new Error\CriticalConfigurationError(
+                'msverifiedid: it is required to set accepted_issuer_ids in config.'
+            );
         }
 
         // Set the optional scope if set by configuration
         if (array_key_exists('scope', $moduleConfig)) {
             $this->stateData->scope = $moduleConfig['scope'];
         }
-        
+
         // Set the optional verifier request purpose if set by configuration
         if (array_key_exists('verifier_request_purpose', $moduleConfig)) {
             $this->stateData->verifierRequestPurpose = $moduleConfig['verifier_request_purpose'];
@@ -150,7 +154,7 @@ class MicrosoftVerifiedId extends Auth\Source
         if (array_key_exists('validate_linked_domain', $moduleConfig)) {
             $this->stateData->validateLinkedDomain = $moduleConfig['validate_linked_domain'];
         }
-        
+
         // Set the optional MS API base URL if set by configuration
         if (array_key_exists('ms_api_base_url', $moduleConfig)) {
             $this->stateData->msApiBaseUrl = $moduleConfig['ms_api_base_url'];
@@ -203,7 +207,6 @@ class MicrosoftVerifiedId extends Auth\Source
      */
     public function authenticate(array &$state): void
     {
-        assert(is_array($state));
         $requester = "Unknown";
         if (isset($state['saml:RequesterID'])) {
             $requester = implode(",", $state['saml:RequesterID']);
@@ -289,7 +292,7 @@ class MicrosoftVerifiedId extends Auth\Source
     }
 
     /**
-     * Initiate request for Verified ID Presentation
+     * Handle request for Verified ID Presentation
      *
      * This function requests a new openid-vc URL and returns
      * the needed info to render the QR code or, on mobile platforms,
@@ -297,14 +300,17 @@ class MicrosoftVerifiedId extends Auth\Source
      *
      * @param string $stateId
      * @param string $opaqueId
+     * @param $presReqHelperClass
      * @return string url
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function initVerifyRequest($stateId, $opaqueId)
+    public static function handleVerifyRequest(
+        $stateId,
+        $opaqueId,
+        $presReqHelperClass
+    )
     {
-        assert(is_string($stateId));
-
         /* Retrieve the authentication state. */
         $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
         if (is_null($state)) {
@@ -326,81 +332,22 @@ class MicrosoftVerifiedId extends Auth\Source
         /* Generate API key for callback */
         $apiKey = Uuid::uuid4()->toString();
         /* Store API key indexed by opaqueId */
-        self::getStore()->set('array', "msverifiedid-$opaqueId", ['apiKey' => $apiKey], time() + self::STORED_DATA_LIFETIME);
-
-        /* Get access token */
-        $provider = new Azure([
-            'clientId'                  => $source->stateData->clientId,
-            'clientSecret'              => $source->stateData->clientSecret,
-            'tenant'                    => $source->stateData->tenantId,
-            'defaultEndPointVersion'    => Azure::ENDPOINT_VERSION_2_0
-        ]);
-    
-        try {
-            $token = $provider->getAccessToken('client_credentials', ['scope' => $source->stateData->scope])->getToken();
-            Logger::debug("*** token = $token");
-        } catch(\Exception $e) {
-            throw new Error\Exception('Get AAD access token failed: '.$e->getMessage());
-        }
-
-        /* Build verify request */
-        $verifyRequest = [
-            'includeQRCode' => false,
-            'callback' => [
-                'url' => Module::getModuleURL('msverifiedid/callback'),
-                'state' => $opaqueId,
-                'headers' => [
-                    'api-key' => $apiKey
-                ]
-            ],
-            'authority' => $source->stateData->verifierId,
-            'registration' => [
-                'clientName' => $source->stateData->verifierClientName
-            ],
-            'includeReceipt' => false,
-            'requestedCredentials' => [
-                [
-                    'type' => $source->stateData->verifiableCredentialType,
-                    'acceptedIssuers' => $source->stateData->acceptedIssuerIds,
-                    'configuration' => [
-                        'validation' => [
-                            'allowRevoked' => $source->stateData->allowRevoked,
-                            'validateLinkedDomain' => true
-                        ]
-                    ]
-                ]
-
-            ]
-        ];
-        if ($source->stateData->verifierRequestPurpose !== null) {
-            $verifyRequest['requestedCredentials'][0]['purpose'] = $source->stateData->verifierRequestPurpose;
-        }
-
-        Logger::debug("*** createPresentationRequest body: " . json_encode($verifyRequest, JSON_UNESCAPED_SLASHES));
-        /* Setup request to send json via POST */
-        $httpClient = new Client();
-        $response = $httpClient->request(
-            'POST',
-            $source->stateData->msApiBaseUrl . 'verifiableCredentials/createPresentationRequest',
-            [
-                'http_errors' => false,
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $token,
-                    'Content-Type' => 'application/json'
-                ],
-                'body' => json_encode($verifyRequest, JSON_UNESCAPED_SLASHES)
-            ]
+        self::getStore()->set(
+            'array',
+            "msverifiedid-$opaqueId",
+            ['apiKey' => $apiKey],
+            time() + self::STORED_DATA_LIFETIME
         );
-        if ($response->getStatusCode() === 201) {
-            // return MS Authenticator URL from response
-            $respObj = json_decode($response->getBody());
-            Logger::debug("*** createPresentationRequest response: " . json_encode($respObj));
-            return $respObj->url;
-        }
 
-        /* throw exception since verify request failed */
-        Logger::error("VC presentation request failed : code = {$response->getStatusCode()}, body = {$response->getBody()->getContents()}");
-        throw new Error\Exception('VC presentation request failed');
+        // initiate VC presentation request
+        $presReqHelper = new $presReqHelperClass(
+            $source->stateData,
+            $opaqueId,
+            $apiKey
+        );
+        $presUrl = $presReqHelper->initPresentationRequest();
+        Logger::debug("*** VC presentation URL = " . $presUrl);
+        return $presUrl;
     }
 
     /**
@@ -429,7 +376,7 @@ class MicrosoftVerifiedId extends Auth\Source
 
         $source = \SimpleSAML\Auth\Source::getById($state[self::AUTHID]);
         if ($source === null) {
-            throw new \Exception('Could not find authentication source with id '.$state[self::AUTHID]);
+            throw new \Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
         }
 
         if (!($source instanceof self)) {
@@ -463,10 +410,6 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\Exception
      */
     public static function handleStatusCheck($stateId, $opaqueId) {
-        Logger::debug("***opaqueId = $opaqueId");
-
-        assert(is_string($stateId));
-
         /* Retrieve the authentication state. */
         $state = \SimpleSAML\Auth\State::loadState($stateId, self::STAGEID);
         if (is_null($state)) {
@@ -478,7 +421,7 @@ class MicrosoftVerifiedId extends Auth\Source
 
         $source = \SimpleSAML\Auth\Source::getById($state[self::AUTHID]);
         if ($source === null) {
-            throw new \Exception('Could not find authentication source with id '.$state[self::AUTHID]);
+            throw new \Exception('Could not find authentication source with id ' . $state[self::AUTHID]);
         }
 
         if (!($source instanceof self)) {
@@ -486,6 +429,9 @@ class MicrosoftVerifiedId extends Auth\Source
         }
 
         $storedData = self::getStore()->get('array', "msverifiedid-$opaqueId");
+        if ($storedData === null) {
+            throw new Error\Exception("Could not retrieve storage for opaqueId $opaqueId.");
+        }
         if (!array_key_exists('claims', $storedData)) {
             return self::PRES_REQ_PENDING;
         } elseif ($storedData['claims'] === self::PRES_REQ_RETRIEVED_STR_VAL) {
@@ -502,7 +448,7 @@ class MicrosoftVerifiedId extends Auth\Source
      * and presents a Verifiable Credential to the service
      *
      * @param array  $body      Parsed JSON request body from MS API callback
-     * @param string $apiKey    API Key passed from MS API callback
+     * @param string|null $apiKey    API Key passed from MS API callback
      * @return bool
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
@@ -516,11 +462,8 @@ class MicrosoftVerifiedId extends Auth\Source
         /* Retrieve stored API Key and claims by opaqueId */
         $store = self::getStore();
         $storedData = $store->get('array', "msverifiedid-$opaqueId");
-        Logger::debug("*** MS-passed apiKey = $apiKey");
-        Logger::debug("*** stored apiKey = {$storedData['apiKey']}");
-        Logger::debug("*** callback body: " . print_r($body, true));
 
-        if ($storedData) {
+        if ($storedData !== null) {
             /* Ensure API key returned by MS is the same one we initially set */
             if (array_key_exists('apiKey', $storedData) && $storedData['apiKey'] === $apiKey) {
                 $claims = null;
@@ -563,8 +506,6 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\Error
      */
     public static function handleStop($stateId) {
-        assert(is_string($stateId));
-
         Logger::notice("Authentication stopped");
 
         /* Retrieve the authentication state. */
@@ -573,7 +514,8 @@ class MicrosoftVerifiedId extends Auth\Source
             throw new \SimpleSAML\Error\NoState();
         }
 
-        Auth\State::throwException($state,
+        Auth\State::throwException(
+            $state,
             new \SimpleSAML\Module\saml\Error(
                 \SAML2\Constants::STATUS_RESPONDER,
                 \SAML2\Constants::STATUS_AUTHN_FAILED,
@@ -591,8 +533,6 @@ class MicrosoftVerifiedId extends Auth\Source
      */
     public function logout(array &$state): void
     {
-        assert(is_array($state));
-
         /*
          * delete claims from session
          */
