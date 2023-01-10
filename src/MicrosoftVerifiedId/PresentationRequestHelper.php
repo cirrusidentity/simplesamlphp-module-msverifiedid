@@ -22,8 +22,7 @@ class PresentationRequestHelper
         StateData $stateData,
         string $opaqueId,
         string $apiKey
-    ): string
-    {
+    ): string {
         /* Get access token */
         $provider = new Azure([
             'clientId'                  => $stateData->clientId,

@@ -16,7 +16,7 @@ use SimpleSAML\Utils\HTTP;
 use SimpleSAML\XHTML\Template;
 use SimpleSAML\TestUtils\StateClearer;
 use Symfony\Component\HttpFoundation\Request;
-use \CirrusIdentity\SSP\Test\InMemoryStore;
+use CirrusIdentity\SSP\Test\InMemoryStore;
 
 /**
  * Set of tests for the controllers in the "msverifiedid" module.
@@ -30,7 +30,7 @@ class MicrosoftVerifiedIdTest extends TestCase
 
     /** @var \SimpleSAML\Session */
     protected Session $session;
- 
+
     /**
      * Set up for each test.
      */
@@ -73,7 +73,7 @@ class MicrosoftVerifiedIdTest extends TestCase
             [
                 'client_id' => 'good-client-id',
                 'client_secret' => 'good-client-secret',
-                'tenant_id' => 'good-tenant-id',            
+                'tenant_id' => 'good-tenant-id',
                 'verifier_id' => 'did:web:www.athena-institute.net',
                 'verifier_client_name' => 'Veriable Credential Expert Verifier',
                 'verifier_credential_type' => 'VerifiedCredentialExpert',
@@ -532,7 +532,7 @@ class MicrosoftVerifiedIdTest extends TestCase
 
         return $c->verify($request);
     }
-    
+
     // private function getStateDataValid(): StateData
     // {
     //     $stateData = new StateData();

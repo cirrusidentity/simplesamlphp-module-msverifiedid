@@ -211,13 +211,15 @@ class MicrosoftVerifiedId
             }
 
             $opaqueId = $this->session->getData('string', 'opaqueId');
-            if (\SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin(
-                $state,
-                $opaqueId
-            )) {
-               $this->getHttp()->redirectTrustedURL($returnTo);
+            if (
+                \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin(
+                    $state,
+                    $opaqueId
+                )
+            ) {
+                $this->getHttp()->redirectTrustedURL($returnTo);
             } else {
-               $this->getHttp()->redirectTrustedURL(Module::getModuleURL('msverifiedid/failed'));
+                $this->getHttp()->redirectTrustedURL(Module::getModuleURL('msverifiedid/failed'));
             }
         } else {
             // if we get this far, we need to show the verified ID presentation request page to the user

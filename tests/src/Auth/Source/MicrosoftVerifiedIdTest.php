@@ -9,7 +9,6 @@ use SimpleSAML\Logger;
 use SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId;
 use SimpleSAML\TestUtils\StateClearer;
 
-
 class MicrosoftVerifiedIdTest extends TestCase
 {
     /**
@@ -44,7 +43,7 @@ class MicrosoftVerifiedIdTest extends TestCase
         );
         Configuration::setPreLoadedConfig($authSourceConfig, 'authsources.php');
     }
-    
+
     public function missingPropertyProvider(): array
     {
         return [
@@ -80,7 +79,7 @@ class MicrosoftVerifiedIdTest extends TestCase
         return [
             'client_id' => 'good-client-id',
             'client_secret' => 'good-client-secret',
-            'tenant_id' => 'good-tenant-id',            
+            'tenant_id' => 'good-tenant-id',
             'verifier_id' => 'did:web:www.athena-institute.net',
             'verifier_client_name' => 'Veriable Credential Expert Verifier',
             'verifier_credential_type' => 'VerifiedCredentialExpert',

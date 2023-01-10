@@ -142,7 +142,7 @@ class MicrosoftVerifiedId extends Auth\Source
         if (array_key_exists('allow_revoked', $moduleConfig)) {
             $this->stateData->allowRevoked = $moduleConfig['allow_revoked'];
         }
-        
+
         // Set the optional allow validateLinkedDomain flag if set by configuration
         if (array_key_exists('validate_linked_domain', $moduleConfig)) {
             $this->stateData->validateLinkedDomain = $moduleConfig['validate_linked_domain'];
@@ -298,8 +298,7 @@ class MicrosoftVerifiedId extends Auth\Source
         $opaqueId,
         $apiKey,
         $presReqHelper
-    )
-    {
+    ) {
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
 
@@ -377,7 +376,8 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function handleStatusCheck($state, $opaqueId) {
+    public static function handleStatusCheck($state, $opaqueId)
+    {
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
 
@@ -415,7 +415,8 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function handleCallback($body, $apiKey) {
+    public static function handleCallback($body, $apiKey)
+    {
         /* Get opaqueId from 'state' property in JSON body */
         $opaqueId = null;
         if (array_key_exists('state', $body)) {
@@ -467,7 +468,8 @@ class MicrosoftVerifiedId extends Auth\Source
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Error
      */
-    public static function handleStop($state) {
+    public static function handleStop($state)
+    {
         Logger::notice("Authentication stopped");
 
         Auth\State::throwException(
