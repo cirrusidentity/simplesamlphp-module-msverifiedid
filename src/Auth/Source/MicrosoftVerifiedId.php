@@ -12,8 +12,6 @@ use SimpleSAML\Session;
 use SimpleSAML\Store\StoreFactory;
 use SimpleSAML\Store\StoreInterface;
 use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\StateData;
-use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper;
-use Ramsey\Uuid\Uuid;
 
 /**
  * Microsoft Entra Verified ID authentication source.
@@ -26,11 +24,6 @@ class MicrosoftVerifiedId extends Auth\Source
      * The key of the AuthID field in the state.
      */
     public const AUTHID = 'msverifiedid:AuthID';
-
-    /**
-     * The key for the stage position in the state.
-     */
-    public const STAGEID = 'msverifiedid:Verify';
 
     /**
      * The value we use in data store to indicate
@@ -226,7 +219,7 @@ class MicrosoftVerifiedId extends Auth\Source
         }
 
         $state[self::AUTHID] = $this->authId;
-        $stateId = Auth\State::saveState($state, self::STAGEID);
+        $stateId = Auth\State::saveState($state, 'msverifiedid:Verify');
 
         $returnTo = Module::getModuleURL('msverifiedid/resume', [
             'StateId' => $stateId,
@@ -252,7 +245,7 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function resumes the authentication process after the user has
      * successfully presented a Verified ID.
      *
-     * @param string $stateId
+     * @param array $state
      * @return void
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
@@ -292,9 +285,10 @@ class MicrosoftVerifiedId extends Auth\Source
      * the needed info to render the QR code or, on mobile platforms,
      * to open a deep link in Microsoft Authenticator.
      *
-     * @param array|null $state
+     * @param array $state
      * @param string $opaqueId
-     * @param $presReqHelperClass
+     * @param string $apiKey
+     * @param \SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper $presReqHelper
      * @return string url
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Exception
@@ -302,7 +296,8 @@ class MicrosoftVerifiedId extends Auth\Source
     public static function handleVerifyRequest(
         $state,
         $opaqueId,
-        $presReqHelperClass
+        $apiKey,
+        $presReqHelper
     )
     {
         /* Find authentication source. */
@@ -317,8 +312,6 @@ class MicrosoftVerifiedId extends Auth\Source
             throw new Error\Exception('Authentication source type changed.');
         }
 
-        /* Generate API key for callback */
-        $apiKey = Uuid::uuid4()->toString();
         /* Store API key indexed by opaqueId */
         self::getStore()->set(
             'array',
@@ -328,12 +321,11 @@ class MicrosoftVerifiedId extends Auth\Source
         );
 
         // initiate VC presentation request
-        $presReqHelper = new $presReqHelperClass(
+        $presUrl = $presReqHelper->initPresentationRequest(
             $source->stateData,
             $opaqueId,
             $apiKey
         );
-        $presUrl = $presReqHelper->initPresentationRequest();
         Logger::debug("*** VC presentation URL = " . $presUrl);
         return $presUrl;
     }
@@ -344,13 +336,13 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function handles the login after successfully
      * completing the credentials verification process
      *
-     * @param array|null $state
+     * @param array $state
      * @param string $opaqueId
      * @param string $returnTo
-     * @return void
+     * @return bool
      * @throws \SimpleSAML\Error\Exception
      */
-    public static function handleLogin($state, $opaqueId, $returnTo)
+    public static function handleLogin($state, $opaqueId)
     {
         /* Find authentication source. */
         assert(array_key_exists(self::AUTHID, $state));
@@ -365,15 +357,12 @@ class MicrosoftVerifiedId extends Auth\Source
         }
 
         $storedData = self::getStore()->get('array', "msverifiedid-$opaqueId");
-        if (array_key_exists('claims', $storedData) && $storedData['claims'] !== null) {
+        if ($storedData !== null && array_key_exists('claims', $storedData) && $storedData['claims'] !== null) {
             Session::getSessionFromRequest()->setData('array', 'claims', $storedData['claims']);
-            $httpUtils = new Utils\HTTP();
-            $httpUtils->redirectTrustedURL($returnTo);
+            return true;
         }
         Logger::error("credential verification failed");
-        $failed = Module::getModuleURL('msverifiedid/failed');
-        $httpUtils = new Utils\HTTP();
-        $httpUtils->redirectTrustedURL($failed);
+        return false;
     }
 
     /**
@@ -382,7 +371,7 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function handles the status check AJAX call
      * from the browser to determine if verification completed
      *
-     * @param array|null $state
+     * @param array $state
      * @param string $opaqueId
      * @return int
      * @throws \SimpleSAML\Error\NoState
@@ -473,7 +462,7 @@ class MicrosoftVerifiedId extends Auth\Source
      * This function handles cancellation of the
      * process by returning a SAML Error Response
      *
-     * @param array|null $state
+     * @param array $state
      * @return void
      * @throws \SimpleSAML\Error\NoState
      * @throws \SimpleSAML\Error\Error

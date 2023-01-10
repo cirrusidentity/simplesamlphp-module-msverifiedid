@@ -8,13 +8,12 @@ use SimpleSAML\Error;
 use SimpleSAML\Logger;
 use SimpleSAML\Module;
 use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper;
-use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\RestApiPresentationRequestHelper;
 use SimpleSAML\Session;
-use SimpleSAML\Utils;
+use SimpleSAML\Utils\HTTP;
 use SimpleSAML\XHTML\Template;
 use Symfony\Component\HttpFoundation\Request;
-use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpFoundation\Response;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Controller class for the msverifiedid module.
@@ -39,16 +38,11 @@ class MicrosoftVerifiedId
     protected $authState = Auth\State::class;
 
     /**
-     * @var \SimpleSAML\Logger|string
-     * @psalm-var \SimpleSAML\Logger|class-string
+     * @var \SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper
      */
-    protected $logger = Logger::class;
+    protected PresentationRequestHelper $presReqHelper;
 
-    /**
-     * @var string
-     * @psalm-var class-string
-     */
-    protected $presReqHelperClass = RestApiPresentationRequestHelper::class;
+    private ?HTTP $http = null;
 
     /**
      * Controller constructor.
@@ -66,6 +60,7 @@ class MicrosoftVerifiedId
     ) {
         $this->config = $config;
         $this->session = $session;
+        $this->presReqHelper = new PresentationRequestHelper();
     }
 
     /**
@@ -79,24 +74,14 @@ class MicrosoftVerifiedId
     }
 
     /**
-     * Inject the \SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper class dependency,
+     * Inject the \SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper dependency,
      * for injecting mock presentation request backend for testing
      *
-     * @param string $presReqHelperClass
+     * @param \SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\PresentationRequestHelper $presReqHelper
      */
-    public function setPresReqHelperClass(string $presReqHelperClass): void
+    public function setPresReqHelper(PresentationRequestHelper $presReqHelper): void
     {
-        $this->presReqHelperClass = $presReqHelperClass;
-    }
-
-    /**
-     * Inject the \SimpleSAML\Logger dependency.
-     *
-     * @param \SimpleSAML\Logger $logger
-     */
-    public function setLogger(Logger $logger): void
-    {
-        $this->logger = $logger;
+        $this->presReqHelper = $presReqHelper;
     }
 
     /**
@@ -147,7 +132,7 @@ class MicrosoftVerifiedId
      */
     public function resume(Request $request): void
     {
-        $stateId = $request->query->get('StateId');
+        $stateId = strval($request->query->get('StateId'));
         if (!$stateId) {
             throw new Error\BadRequest('Missing required StateId query parameter.');
         }
@@ -170,7 +155,7 @@ class MicrosoftVerifiedId
      */
     public function status(Request $request): Response
     {
-        $stateId = $request->query->get('StateId');
+        $stateId = strval($request->query->get('StateId'));
         if (!$stateId) {
             throw new Error\BadRequest('Missing required StateId query parameter.');
         }
@@ -200,6 +185,8 @@ class MicrosoftVerifiedId
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
      * @return \SimpleSAML\XHTML\Template
+     * @psalm-suppress InvalidReturnType
+     * @psalm-suppress InternalMethod
      */
     public function verify(Request $request): Template
     {
@@ -214,7 +201,7 @@ class MicrosoftVerifiedId
             throw new Error\BadRequest('Missing required ReturnTo parameter.');
         }
 
-        $httpUtils = new Utils\HTTP();
+        $httpUtils = new HTTP();
         $returnTo = $httpUtils->checkURLAllowed($returnTo);
 
         // time to handle login response
@@ -224,19 +211,30 @@ class MicrosoftVerifiedId
             }
 
             $opaqueId = $this->session->getData('string', 'opaqueId');
-            \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin(
+            if (\SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleLogin(
                 $state,
-                $opaqueId,
-                $returnTo
-            );
+                $opaqueId
+            )) {
+               $this->getHttp()->redirectTrustedURL($returnTo);
+            } else {
+               $this->getHttp()->redirectTrustedURL(Module::getModuleURL('msverifiedid/failed'));
+            }
         } else {
             // if we get this far, we need to show the verified ID presentation request page to the user
+
+            /* opaque ID for identifying VC presentation request during callbacks */
             $opaqueId = Uuid::uuid4()->toString();
+            /* Generate API key for authorize callback */
+            $apiKey = Uuid::uuid4()->toString();
+
             $this->session->setData('string', 'opaqueId', $opaqueId);
+            $this->session->setData('string', 'apiKey', $apiKey);
+
             $verifyUrl = \SimpleSAML\Module\msverifiedid\Auth\Source\MicrosoftVerifiedId::handleVerifyRequest(
                 $state,
                 $opaqueId,
-                $this->presReqHelperClass
+                $apiKey,
+                $this->presReqHelper
             );
             $statusUrl = Module::getModuleURL('msverifiedid/status', [
                 'StateId' => $stateId,
@@ -262,10 +260,26 @@ class MicrosoftVerifiedId
     private function fetchAuthState($stateId): array
     {
         /* Retrieve the authentication state. */
-        $state = $this->authState::loadState($stateId, 'msverifiedid:Verify');
-        if (is_null($state)) {
-            throw new \SimpleSAML\Error\NoState();
+        return $this->authState::loadState($stateId, 'msverifiedid:Verify');
+    }
+
+    /**
+     * Used to allow tests to override
+     * @return HTTP
+     */
+    public function getHttp(): HTTP
+    {
+        if (!isset($this->http)) {
+            $this->http = new HTTP();
         }
-        return $state;
+        return $this->http;
+    }
+
+    /**
+     * @param ?HTTP $http
+     */
+    public function setHttp(?HTTP $http): void
+    {
+        $this->http = $http;
     }
 }
