@@ -527,8 +527,10 @@ class MicrosoftVerifiedIdTest extends TestCase
         });
 
         $mockPresReqHelper = $this->createMock(PresentationRequestHelper::class);
+        // phpcs:disable
         $mockPresReqHelper->method('initPresentationRequest')
             ->willReturn('openid-vc://?request_uri=https://beta.did.msidentity.com/v1.0/tenants/5c8b71e9-6b28-4bfd-9bf5-c44c7883ac22/verifiableCredentials/presentationRequests/ae1f7d86-17f7-4152-a71e-468630b34d7f');
+        // phpcs:enable
 
         $c->setPresReqHelper($mockPresReqHelper);
 
