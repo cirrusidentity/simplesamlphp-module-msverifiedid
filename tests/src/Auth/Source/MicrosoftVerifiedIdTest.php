@@ -52,7 +52,7 @@ class MicrosoftVerifiedIdTest extends TestCase
             ['tenant_id'],
             ['verifier_id'],
             ['verifier_client_name'],
-            ['verifier_credential_type'],
+            ['verifiable_credential_type'],
             ['accepted_issuer_ids']
         ];
     }
@@ -82,7 +82,7 @@ class MicrosoftVerifiedIdTest extends TestCase
             'tenant_id' => 'good-tenant-id',
             'verifier_id' => 'did:web:www.athena-institute.net',
             'verifier_client_name' => 'Veriable Credential Expert Verifier',
-            'verifier_credential_type' => 'VerifiedCredentialExpert',
+            'verifiable_credential_type' => 'VerifiedCredentialExpert',
             'accepted_issuer_ids' => ['did:web:www.athena-institute.net'],
             'scope' => '3db474b9-6a0c-4840-96ac-1fceb342124f/.default',
             'verifier_request_purpose' => 'To verify status',

@@ -17,7 +17,7 @@ $config = [
     // The verifiable credential type. The type must match the type
     // as defined in the issuer verifiable credential manifest
     // (for example, VerifiedCredentialExpert).
-    'verifier_credential_type' => 'VerifiedCredentialExpert',
+    'verifiable_credential_type' => 'VerifiedCredentialExpert',
     // A collection of issuers' DIDs that could issue the type
     // of verifiable credential that subjects can present. 
     'accepted_issuer_ids' => ['did:web:www.athena-institute.net'],

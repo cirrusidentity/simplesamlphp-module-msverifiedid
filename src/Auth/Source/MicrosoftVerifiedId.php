@@ -2,6 +2,7 @@
 
 namespace SimpleSAML\Module\msverifiedid\Auth\Source;
 
+use SimpleSAML\Assert\AssertionFailedException;
 use SimpleSAML\Auth;
 use SimpleSAML\Configuration;
 use SimpleSAML\Error;
@@ -11,6 +12,7 @@ use SimpleSAML\Logger;
 use SimpleSAML\Session;
 use SimpleSAML\Store\StoreFactory;
 use SimpleSAML\Store\StoreInterface;
+use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\AttributeManipulator;
 use SimpleSAML\Module\msverifiedid\MicrosoftVerifiedId\StateData;
 
 /**
@@ -67,6 +69,12 @@ class MicrosoftVerifiedId extends Auth\Source
     private StateData $stateData;
 
     /**
+     * @var \SimpleSAML\Configuration
+     */
+    protected $config;
+
+
+    /**
      * Constructor for this authentication source.
      *
      * @param array $info  Information about this authentication source.
@@ -76,81 +84,98 @@ class MicrosoftVerifiedId extends Auth\Source
     {
         parent::__construct($info, $config);
 
+        $this->config = Configuration::loadFromArray($config, 'authsources:msverifiedid');
+
         $this->stateData = new StateData();
 
-        $moduleConfig = Configuration::getOptionalConfig('module_msverifiedid.php')->toArray();
+        $moduleConfig = Configuration::getConfig('module_msverifiedid.php');
 
-        if (array_key_exists('client_id', $moduleConfig)) {
-            $this->stateData->clientId = $moduleConfig['client_id'];
-        } else {
+        try {
+            $this->stateData->clientId = $moduleConfig->getString('client_id');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError('msverifiedid: it is required to set client_id in config.');
         }
 
-        if (array_key_exists('client_secret', $moduleConfig)) {
-            $this->stateData->clientSecret = $moduleConfig['client_secret'];
-        } else {
+        try {
+            $this->stateData->clientSecret = $moduleConfig->getString('client_secret');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError('msverifiedid: it is required to set client_secret in config.');
         }
 
-        if (array_key_exists('tenant_id', $moduleConfig)) {
-            $this->stateData->tenantId = $moduleConfig['tenant_id'];
-        } else {
+        try {
+            $this->stateData->tenantId = $moduleConfig->getString('tenant_id');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError('msverifiedid: it is required to set tenant_id in config.');
         }
 
-        if (array_key_exists('verifier_id', $moduleConfig)) {
-            $this->stateData->verifierId = $moduleConfig['verifier_id'];
-        } else {
+        try {
+            $this->stateData->verifierId = $moduleConfig->getString('verifier_id');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError('msverifiedid: it is required to set verifier_id in config.');
         }
 
-        if (array_key_exists('verifier_client_name', $moduleConfig)) {
-            $this->stateData->verifierClientName = $moduleConfig['verifier_client_name'];
-        } else {
+        try {
+            $this->stateData->verifierClientName = $moduleConfig->getString('verifier_client_name');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError(
                 'msverifiedid: it is required to set verifier_client_name in config.'
             );
         }
 
-        if (array_key_exists('verifier_credential_type', $moduleConfig)) {
-            $this->stateData->verifiableCredentialType = $moduleConfig['verifier_credential_type'];
-        } else {
+        try {
+            $this->stateData->verifiableCredentialType = $moduleConfig->getString('verifiable_credential_type');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError(
-                'msverifiedid: it is required to set verifier_credential_type in config.'
+                'msverifiedid: it is required to set verifiable_credential_type in config.'
             );
         }
 
-        if (array_key_exists('accepted_issuer_ids', $moduleConfig)) {
-            $this->stateData->acceptedIssuerIds = $moduleConfig['accepted_issuer_ids'];
-        } else {
+        try {
+            $this->stateData->acceptedIssuerIds = $moduleConfig->getArray('accepted_issuer_ids');
+        } catch (AssertionFailedException $e) {
             throw new Error\CriticalConfigurationError(
                 'msverifiedid: it is required to set accepted_issuer_ids in config.'
             );
         }
 
-        // Set the optional scope if set by configuration
-        if (array_key_exists('scope', $moduleConfig)) {
-            $this->stateData->scope = $moduleConfig['scope'];
+        try {
+            $this->stateData->scope = $moduleConfig->getOptionalString(
+                'scope',
+                '3db474b9-6a0c-4840-96ac-1fceb342124f/.default'
+            );
+        } catch (AssertionFailedException $e) {
+            throw new Error\CriticalConfigurationError('msverifiedid: invalid value for scope in config.');
         }
 
-        // Set the optional verifier request purpose if set by configuration
-        if (array_key_exists('verifier_request_purpose', $moduleConfig)) {
-            $this->stateData->verifierRequestPurpose = $moduleConfig['verifier_request_purpose'];
+        try {
+            $this->stateData->verifierRequestPurpose = $moduleConfig->getOptionalString('verifier_request_purpose', '');
+        } catch (AssertionFailedException $e) {
+            throw new Error\CriticalConfigurationError(
+                'msverifiedid: invalid value for verifier_request_purpose in config.'
+            );
         }
 
-        // Set the optional allow revoked flag if set by configuration
-        if (array_key_exists('allow_revoked', $moduleConfig)) {
-            $this->stateData->allowRevoked = $moduleConfig['allow_revoked'];
+        try {
+            $this->stateData->allowRevoked = $moduleConfig->getOptionalBoolean('allow_revoked', false);
+        } catch (AssertionFailedException $e) {
+            throw new Error\CriticalConfigurationError('msverifiedid: invalid value for allow_revoked in config.');
         }
 
-        // Set the optional allow validateLinkedDomain flag if set by configuration
-        if (array_key_exists('validate_linked_domain', $moduleConfig)) {
-            $this->stateData->validateLinkedDomain = $moduleConfig['validate_linked_domain'];
+        try {
+            $this->stateData->validateLinkedDomain = $moduleConfig->getOptionalBoolean('validate_linked_domain', true);
+        } catch (AssertionFailedException $e) {
+            throw new Error\CriticalConfigurationError(
+                'msverifiedid: invalid value for validate_linked_domain in config.'
+            );
         }
 
-        // Set the optional MS API base URL if set by configuration
-        if (array_key_exists('ms_api_base_url', $moduleConfig)) {
-            $this->stateData->msApiBaseUrl = $moduleConfig['ms_api_base_url'];
+        try {
+            $this->stateData->msApiBaseUrl = $moduleConfig->getOptionalString(
+                'ms_api_base_url',
+                'https://verifiedid.did.msidentity.com/v1.0/'
+            );
+        } catch (AssertionFailedException $e) {
+            throw new Error\CriticalConfigurationError('msverifiedid: invalid value for ms_api_base_url in config.');
         }
     }
 
@@ -162,34 +187,14 @@ class MicrosoftVerifiedId extends Auth\Source
      */
     private function getUser(): ?array
     {
-        /*
-         * In this example we assume that the attributes are
-         * stored in the users PHP session, but this could be replaced
-         * with anything.
-         */
-
-        if (!session_id()) {
-            // session_start not called before. Do it here
-            session_start();
-        }
-
         $claims = Session::getSessionFromRequest()->getData('array', 'claims');
         if (is_null($claims)) {
             // The user isn't authenticated
             return null;
         }
 
-        /*
-         * Find the attributes for the user.
-         * Note that all attributes in SimpleSAMLphp are multivalued, so we need
-         * to store them as arrays.
-         */
-        $attributes = [];
-        foreach ($claims as $attr => $val) {
-            $attributes[$attr] = [$val];
-        }
-
-        return $attributes;
+        $attributeManipulator = new AttributeManipulator();
+        return $attributeManipulator->prefixAndFlatten($claims, $this->getAttributePrefix());
     }
 
     /**
@@ -509,5 +514,10 @@ class MicrosoftVerifiedId extends Auth\Source
         $store = StoreFactory::getInstance($storeType);
         assert($store !== false, "Store must be configured");
         return $store;
+    }
+
+    protected function getAttributePrefix(): string
+    {
+        return $this->config->getOptionalString('attributePrefix', '');
     }
 }

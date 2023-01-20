@@ -49,9 +49,9 @@ class StateData
     /**
      * Purpose for requesting VC
      *
-     * @var string|null
+     * @var string
      */
-    public ?string $verifierRequestPurpose = null;
+    public ?string $verifierRequestPurpose;
 
     /**
      * Array of issuer IDs from which to accept VCs

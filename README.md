@@ -66,5 +66,15 @@ $config = [
     ],
 ...
 ```
+*Note*: If you wish to add a prefix to the attributes returned from the authentication source, you may do so by adding an `attributePrefix` property, e.g.:
+```php
+$config = [
+...
+    'msverifiedid' => [
+        'msverifiedid:MicrosoftVerifiedId',
+        'attributePrefix' => 'vc.'
+    ],
+...
+```
 
 Then you need to copy `config-templates/module_msverifiedid.php` to your config directory and adjust settings accordingly (using the values collected under `Gather configuration details` above). See the file for parameters description.

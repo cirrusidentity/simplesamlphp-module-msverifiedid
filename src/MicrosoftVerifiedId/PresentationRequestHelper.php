@@ -70,7 +70,7 @@ class PresentationRequestHelper
 
             ]
         ];
-        if ($stateData->verifierRequestPurpose !== null) {
+        if ($stateData->verifierRequestPurpose) {
             $verifyRequest['requestedCredentials'][0]['purpose'] = $stateData->verifierRequestPurpose;
         }
 

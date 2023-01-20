@@ -76,7 +76,7 @@ class MicrosoftVerifiedIdTest extends TestCase
                 'tenant_id' => 'good-tenant-id',
                 'verifier_id' => 'did:web:www.athena-institute.net',
                 'verifier_client_name' => 'Veriable Credential Expert Verifier',
-                'verifier_credential_type' => 'VerifiedCredentialExpert',
+                'verifiable_credential_type' => 'VerifiedCredentialExpert',
                 'accepted_issuer_ids' => ['did:web:www.athena-institute.net'],
                 'scope' => '3db474b9-6a0c-4840-96ac-1fceb342124f/.default',
                 'verifier_request_purpose' => 'To verify status',
@@ -488,9 +488,11 @@ class MicrosoftVerifiedIdTest extends TestCase
 
         $this->expectExceptionMessage('Redirect expected');
 
-        $c->verify($request);
-
-        $this->assertSame(['firstName' => 'Foo', 'lastName' => 'Bar'], $this->session->getData('claims'));
+        try {
+            $c->verify($request);
+        } finally {
+            $this->assertSame(['firstName' => 'Foo', 'lastName' => 'Bar'], $this->session->getData('array', 'claims'));
+        }
     }
 
     private function getValidVerifyUrl(): Template
@@ -532,24 +534,6 @@ class MicrosoftVerifiedIdTest extends TestCase
 
         return $c->verify($request);
     }
-
-    // private function getStateDataValid(): StateData
-    // {
-    //     $stateData = new StateData();
-    //     $stateData->clientId = 'good-client-id';
-    //     $stateData->clientSecret ='good-client-secret';
-    //     $stateData->tenantId = 'good-tenant-id';
-    //     $stateData->verifierId = 'did:web:www.athena-institute.net';
-    //     $stateData->verifierClientName = 'Veriable Credential Expert Verifier';
-    //     $stateData->verifiableCredentialType = 'VerifiedCredentialExpert';
-    //     $stateData->acceptedIssuerIds = ['did:web:www.athena-institute.net'];
-    //     $stateData->scope = '3db474b9-6a0c-4840-96ac-1fceb342124f/.default';
-    //     $stateData->verifierRequestPurpose = 'To verify status';
-    //     $stateData->msApiBaseUrl = 'https://verifiedid.did.msidentity.com/v1.0/';
-    //     $stateData->allowRevoked = false;
-    //     $stateData->validateLinkedDomain = true;
-    //     return $stateData;
-    // }
 
     private function getSession(): Session
     {
