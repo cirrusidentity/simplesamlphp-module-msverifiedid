@@ -1,5 +1,5 @@
 {
-    "name": "windhamg/simplesamlphp-module-msverifiedid",
+    "name": "cirrusidentity/simplesamlphp-module-msverifiedid",
     "description": "This module provides an authentication module that uses Microsoft Entra Verified ID",
     "type": "simplesamlphp-module",
     "keywords": [
@@ -44,8 +44,8 @@
         "simplesamlphp/simplesamlphp-test-framework": "~1.2.1"
     },
     "support": {
-        "issues": "https://github.com/windhamg/simplesamlphp-module-msverifiedid/issues",
-        "source": "https://github.com/windhamg/simplesamlphp-module-msverifiedid"
+        "issues": "https://github.com/cirrusidentity/simplesamlphp-module-msverifiedid/issues",
+        "source": "https://github.com/cirrusidentity/simplesamlphp-module-msverifiedid"
     },
     "scripts": {
         "validate": [

@@ -78,3 +78,51 @@ $config = [
 ```
 
 Then you need to copy `config-templates/module_msverifiedid.php` to your config directory and adjust settings accordingly (using the values collected under `Gather configuration details` above). See the file for parameters description.
+
+## Local testing
+
+  1. Clone the `ssp2` branch from https://github.com/cirrusidentity/docker-simplesamlphp (clone into a separate directory outside this project):
+     ```bash
+     git clone --branch ssp2 --single-branch https://github.com/cirrusidentity/docker-simplesamlphp.git
+     ```
+  2. `cd` into the `docker-simplesamlphp` project directory.
+  3. 
+     ```bash
+     cd docker-simplesamlphp/docker
+     SSP_IMAGE_TAG=v2.0.0-rc2
+     docker build -t cirrusid/simplesamlphp:$SSP_IMAGE_TAG -f Dockerfile .
+     docker tag cirrusid/simplesamlphp:$SSP_IMAGE_TAG
+     docker tag cirrusid/simplesamlphp:$SSP_IMAGE_TAG cirrusid/simplesamlphp:latest
+     ```
+  4. Now use [ngrok](https://ngrok.com/) to create a hosted HTTPS proxy for your local SSP instance. In a shell: `ngrok http https://localhost:8443`. Record the forwarding URL (e.g., `https://2c1c-69-137-176-246.ngrok.io`) for later.
+  5. `cd` back into this project directory.
+  6. Run the following command in a shell in the top-level of this project directory. Replace `https://2c1c-69-137-176-246.ngrok.io` with whatever ngrok returned for your forwarding URL in step 4, above. If your ngrok forwarding URL changes in the future, you can re-run this command to update it (just use the previous ngrok URL value instead of `https://your-forwarding-url.ngrok.io`).
+     ```bash
+     scripts/set-ngrok-url.sh https://your-forwarding-url.ngrok.io https://2c1c-69-137-176-246.ngrok.io
+     ```
+  7. Copy `config-templates/module_msverifiedid.php` to the `samples/idp` folder and edit, per the instructions in [Configuration](#configuration) above. A working sample file is not included for this particular file, as it requires a client ID/key from your Azure AD application.
+  8. Run the following to launch the `docker-simplesamlphp` container, using the local `simplesamlphp-module-msverifiedid` module and configuration files from the `samples` directory:
+     ```bash
+     docker run --name ssp-idp \                                              
+     --mount type=bind,source="$(pwd)/samples/cert",target=/var/simplesamlphp/cert,readonly \
+     --mount type=bind,source="$(pwd)/samples/idp/authsources.php",target=/var/simplesamlphp/config/authsources.php,readonly \
+     --mount type=bind,source="$(pwd)/samples/idp/config-override.php",target=/var/simplesamlphp/config/config-override.php,readonly \
+     --mount type=bind,source="$(pwd)/samples/idp/saml20-idp-hosted.php",target=/var/simplesamlphp/metadata/saml20-idp-hosted.php,readonly \
+     --mount type=bind,source="$(pwd)/samples/sp/saml20-idp-remote.php",target=/var/simplesamlphp/metadata/saml20-idp-remote.php,readonly \
+     --mount type=bind,source="$(pwd)/samples/idp/saml20-sp-remote.php",target=/var/simplesamlphp/metadata/saml20-sp-remote.php,readonly \
+     --mount type=bind,source="$(pwd)/samples/idp/module_msverifiedid.php",target=/var/simplesamlphp/config/module_msverifiedid.php,readonly \
+     --mount type=bind,source="$(pwd)/samples/attributemap",target=/var/simplesamlphp/attributemap,readonly \
+     --mount type=bind,source="$(pwd)",target=/var/simplesamlphp/staging-modules/msverifiedid,readonly \
+     -e STAGINGCOMPOSERREPOS=msverifiedid \
+     -e COMPOSER_REQUIRE="cirrusidentity/simplesamlphp-module-msverifiedid:dev-main" \
+     -e SSP_ADMIN_PASSWORD=secret1 \
+     -e SSP_SECRET_SALT=mysalt \
+     -e SSP_APACHE_ALIAS=sample-idp/ \
+     -p 8443:443 cirrusid/simplesamlphp:latest
+     ```
+  9.  In a browser do the following:
+      - go to https://your-forwarding-url.ngrok.io/sample-idp/module.php/admin/test and login as `admin` with password `secret1` (or whatever you set `SSP_ADMIN_PASSWORD` to in step 8. above)
+      - select the `default-sp` test link
+      - you will be presented with a presentation request for your Microsoft verified credential. Scan the QR code with the MS Authenticator app on your mobile device (if using a mobile browser, you should be prompted to open the MS Authenticator app).
+      - Click the "Share" button in the MS authenticator app to confirm release of your verified credential to the verifying party.
+      - the SSP module will complete authentication, and the test IdP will return you back to the `default-sp`, which will display the attributes mapped from the verified credential claims
