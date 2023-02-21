@@ -111,7 +111,7 @@ Then you need to copy `config-templates/module_msverifiedid.php` to your config 
      --mount type=bind,source="$(pwd)/samples/sp/saml20-idp-remote.php",target=/var/simplesamlphp/metadata/saml20-idp-remote.php,readonly \
      --mount type=bind,source="$(pwd)/samples/idp/saml20-sp-remote.php",target=/var/simplesamlphp/metadata/saml20-sp-remote.php,readonly \
      --mount type=bind,source="$(pwd)/samples/idp/module_msverifiedid.php",target=/var/simplesamlphp/config/module_msverifiedid.php,readonly \
-     --mount type=bind,source="$(pwd)/samples/attributemap",target=/var/simplesamlphp/attributemap,readonly \
+     --mount type=bind,source="$(pwd)/samples/attributemap/vc2name.php",target=/var/simplesamlphp/attributemap/vc2name.php,readonly \
      --mount type=bind,source="$(pwd)",target=/var/simplesamlphp/staging-modules/msverifiedid,readonly \
      -e STAGINGCOMPOSERREPOS=msverifiedid \
      -e COMPOSER_REQUIRE="cirrusidentity/simplesamlphp-module-msverifiedid:dev-main" \
